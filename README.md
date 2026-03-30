@@ -45,6 +45,8 @@ npm install
 
 Create a root `.env` file based on `.env.example` and add the required values for deployment.
 
+For the frontend, create `frontend/.env` from `frontend/.env.example` when running locally.
+
 ## Useful commands
 
 From the repo root:
@@ -61,6 +63,17 @@ From `frontend/`:
 npm run dev
 npm run build
 npm run preview
+```
+
+## Vercel deployment
+
+This repo includes a root `vercel.json` that tells Vercel to build the React app from `frontend/` and publish `frontend/dist`.
+
+Set these Vercel project environment variables before deploying:
+
+```bash
+VITE_CONTRACT_ADDRESS=your_deployed_contract_address
+VITE_ORACLE_ADDRESS=your_oracle_wallet_address
 ```
 
 ## Network
