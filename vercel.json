@@ -2,12 +2,21 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "installCommand": "cd frontend && npm install",
   "buildCommand": "cd frontend && npm run build",
-  "outputDirectory": "frontend/dist",
-  "framework": "vite",
-  "rewrites": [
+  "outputDirectory": "frontend/out",
+  "framework": "nextjs",
+  "headers": [
     {
       "source": "/(.*)",
-      "destination": "/index.html"
+      "headers": [
+        {
+          "key": "Cross-Origin-Opener-Policy",
+          "value": "same-origin"
+        },
+        {
+          "key": "Cross-Origin-Embedder-Policy",
+          "value": "credentialless"
+        }
+      ]
     }
   ]
 }

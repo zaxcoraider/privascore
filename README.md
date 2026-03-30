@@ -9,7 +9,7 @@ PrivaScore stores user credit scores as encrypted values on-chain and lets lende
 - `contracts/`: Hardhat smart contract for encrypted credit score storage and eligibility checks
 - `scripts/`: deployment script
 - `test/`: Hardhat tests
-- `frontend/`: React + Vite frontend for interacting with the contract
+- `frontend/`: Next.js + Tailwind frontend for interacting with the contract
 
 ## Stack
 
@@ -17,7 +17,7 @@ PrivaScore stores user credit scores as encrypted values on-chain and lets lende
 - Hardhat + TypeScript
 - Fhenix `cofhe-contracts`
 - `cofhejs`
-- React + Vite + Ethers
+- Next.js + Tailwind CSS + Ethers
 
 ## Core flow
 
@@ -45,7 +45,7 @@ npm install
 
 Create a root `.env` file based on `.env.example` and add the required values for deployment.
 
-For the frontend, create `frontend/.env` from `frontend/.env.example` when running locally.
+For the frontend, create `frontend/.env.local` from `frontend/.env.example` when running locally.
 
 ## Useful commands
 
@@ -62,18 +62,17 @@ From `frontend/`:
 ```bash
 npm run dev
 npm run build
-npm run preview
 ```
 
 ## Vercel deployment
 
-This repo includes a root `vercel.json` that tells Vercel to build the React app from `frontend/` and publish `frontend/dist`.
+This repo includes a root `vercel.json` that tells Vercel to build the Next.js app from `frontend/` and publish the static export from `frontend/out`.
 
 Set these Vercel project environment variables before deploying:
 
 ```bash
-VITE_CONTRACT_ADDRESS=your_deployed_contract_address
-VITE_ORACLE_ADDRESS=your_oracle_wallet_address
+NEXT_PUBLIC_CONTRACT_ADDRESS=your_deployed_contract_address
+NEXT_PUBLIC_ORACLE_ADDRESS=your_oracle_wallet_address
 ```
 
 ## Network
