@@ -1,10 +1,12 @@
 import Navbar from "../components/navbar";
 import Hero from "../components/hero";
 import PrivaScorePanel from "../components/privascore-panel";
+import WalletModal from "../components/wallet-modal";
 
 export default function HomePage() {
   return (
     <main className="min-h-screen bg-hero text-slate-50">
+      <WalletModal />
       <div className="mx-auto flex min-h-screen max-w-7xl flex-col px-6 pb-10 pt-6 sm:px-8 lg:px-10">
         <Navbar />
         <Hero />
@@ -18,4 +20,3 @@ export default function HomePage() {
     </main>
   );
 }
-

@@ -1,17 +1,47 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { BrowserProvider, Contract } from "ethers";
 import { cofhejs, Encryptable, FheTypes } from "cofhejs/web";
+import { useAccount, usePublicClient, useWalletClient } from "wagmi";
+import { waitForTransactionReceipt, writeContract } from "@wagmi/core";
+import { wagmiConfig } from "../lib/wallet-config";
+import { useWalletUi } from "./app-providers";
 
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS;
 const ORACLE_ADDRESS = (process.env.NEXT_PUBLIC_ORACLE_ADDRESS || "").toLowerCase();
 
 const ABI = [
-  "function updateScore(address wallet, tuple(bytes32 ctHash, bytes signature) encScore) external",
-  "function isEligible(address wallet, tuple(bytes32 ctHash, bytes signature) threshold) external returns (bytes32)",
-  "function getEligCheckHash(address lender) view returns (bytes32)",
-  "function getMyScoreHash() view returns (bytes32)",
+  {
+    type: "function",
+    stateMutability: "nonpayable",
+    name: "isEligible",
+    inputs: [
+      { name: "wallet", type: "address" },
+      {
+        name: "threshold",
+        type: "tuple",
+        components: [
+          { name: "ctHash", type: "bytes32" },
+          { name: "signature", type: "bytes" },
+        ],
+      },
+    ],
+    outputs: [{ type: "bytes32" }],
+  },
+  {
+    type: "function",
+    stateMutability: "view",
+    name: "getEligCheckHash",
+    inputs: [{ name: "lender", type: "address" }],
+    outputs: [{ type: "bytes32" }],
+  },
+  {
+    type: "function",
+    stateMutability: "view",
+    name: "getMyScoreHash",
+    inputs: [],
+    outputs: [{ type: "bytes32" }],
+  },
 ];
 
 const initialStatus = { tone: "idle", label: "Encrypted systems standing by." };
@@ -39,38 +69,31 @@ function StatusLine({ busy, message, tone }) {
 }
 
 export default function PrivaScorePanel() {
-  const [provider, setProvider] = useState(null);
-  const [signer, setSigner] = useState(null);
-  const [contract, setContract] = useState(null);
-  const [account, setAccount] = useState("");
+  const { address: account, isConnected } = useAccount();
+  const publicClient = usePublicClient();
+  const { data: walletClient } = useWalletClient();
+  const { openWalletModal } = useWalletUi();
   const [threshold, setThreshold] = useState("700");
   const [score, setScore] = useState(null);
   const [eligibility, setEligibility] = useState(null);
   const [busyAction, setBusyAction] = useState("");
   const [status, setStatus] = useState(initialStatus);
 
-  const isConnected = Boolean(signer && contract && account);
   const isOracle = useMemo(() => account && account.toLowerCase() === ORACLE_ADDRESS, [account]);
 
-  async function ensureConnection() {
-    if (!window.ethereum) {
-      throw new Error("No injected wallet found. Install MetaMask or a compatible wallet.");
+  async function ensureWalletReady() {
+    if (!CONTRACT_ADDRESS) {
+      throw new Error("Missing NEXT_PUBLIC_CONTRACT_ADDRESS. Set your frontend environment variables first.");
     }
 
-    const nextProvider = provider || new BrowserProvider(window.ethereum);
-    await nextProvider.send("eth_requestAccounts", []);
-    const nextSigner = await nextProvider.getSigner();
-    const nextAddress = await nextSigner.getAddress();
-    const nextContract = new Contract(CONTRACT_ADDRESS, ABI, nextSigner);
+    if (!isConnected || !publicClient || !walletClient || !account) {
+      openWalletModal();
+      throw new Error("Connect a wallet to continue.");
+    }
 
-    setProvider(nextProvider);
-    setSigner(nextSigner);
-    setContract(nextContract);
-    setAccount(nextAddress);
-
-    const initResult = await cofhejs.initializeWithEthers({
-      ethersProvider: nextProvider,
-      ethersSigner: nextSigner,
+    const initResult = await cofhejs.initializeWithViem({
+      viemClient: publicClient,
+      viemWalletClient: walletClient,
       environment: "TESTNET",
     });
 
@@ -78,32 +101,7 @@ export default function PrivaScorePanel() {
       throw new Error(initResult.error.message);
     }
 
-    return { signer: nextSigner, contract: nextContract, account: nextAddress };
-  }
-
-  async function connectWallet() {
-    if (!CONTRACT_ADDRESS) {
-      setStatus({
-        tone: "error",
-        label: "Missing NEXT_PUBLIC_CONTRACT_ADDRESS. Set your frontend environment variables first.",
-      });
-      return;
-    }
-
-    setBusyAction("connect");
-    setStatus({ tone: "idle", label: "Connecting your wallet..." });
-
-    try {
-      const { account: connectedAccount } = await ensureConnection();
-      setStatus({
-        tone: "success",
-        label: `Wallet connected: ${formatAddress(connectedAccount)}`,
-      });
-    } catch (error) {
-      setStatus({ tone: "error", label: error.message || "Wallet connection failed." });
-    } finally {
-      setBusyAction("");
-    }
+    return { account, publicClient, walletClient };
   }
 
   async function viewScore() {
@@ -112,8 +110,13 @@ export default function PrivaScorePanel() {
     setStatus({ tone: "idle", label: "Unsealing your encrypted score..." });
 
     try {
-      const ctx = await ensureConnection();
-      const ctHash = await ctx.contract.getMyScoreHash();
+      const ctx = await ensureWalletReady();
+      const ctHash = await ctx.publicClient.readContract({
+        address: CONTRACT_ADDRESS,
+        abi: ABI,
+        functionName: "getMyScoreHash",
+        account: ctx.account,
+      });
       const result = await cofhejs.unseal(BigInt(ctHash), FheTypes.Uint32, ctx.account);
 
       if (result.error) {
@@ -143,7 +146,7 @@ export default function PrivaScorePanel() {
     setStatus({ tone: "idle", label: "Running encrypted eligibility check..." });
 
     try {
-      const ctx = await ensureConnection();
+      const ctx = await ensureWalletReady();
       const encrypted = await cofhejs.encrypt(() => {}, [Encryptable.uint32(BigInt(threshold))]);
 
       if (encrypted.error) {
@@ -151,10 +154,22 @@ export default function PrivaScorePanel() {
       }
 
       const [encThreshold] = encrypted.data;
-      const tx = await ctx.contract.isEligible(ctx.account, encThreshold);
-      await tx.wait();
+      const hash = await writeContract(wagmiConfig, {
+        address: CONTRACT_ADDRESS,
+        abi: ABI,
+        functionName: "isEligible",
+        args: [ctx.account, encThreshold],
+        account: ctx.account,
+      });
 
-      const ctHash = await ctx.contract.getEligCheckHash(ctx.account);
+      await waitForTransactionReceipt(wagmiConfig, { hash });
+
+      const ctHash = await ctx.publicClient.readContract({
+        address: CONTRACT_ADDRESS,
+        abi: ABI,
+        functionName: "getEligCheckHash",
+        args: [ctx.account],
+      });
       const result = await cofhejs.unseal(BigInt(ctHash), FheTypes.Bool, ctx.account);
 
       if (result.error) {
@@ -192,13 +207,18 @@ export default function PrivaScorePanel() {
               Connect your wallet to reveal your encrypted credit score and run a threshold check on the connected account.
             </p>
           </div>
-          <button
-            onClick={connectWallet}
-            disabled={busyAction === "connect"}
-            className="inline-flex items-center justify-center rounded-full border border-white/10 bg-white/8 px-5 py-3 text-sm font-medium text-white transition hover:border-accent/40 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-70"
-          >
-            {busyAction === "connect" ? "Connecting..." : isConnected ? formatAddress(account) : "Connect Wallet"}
-          </button>
+          {isConnected ? (
+            <div className="inline-flex items-center justify-center rounded-full border border-white/10 bg-white/8 px-5 py-3 text-sm font-medium text-white">
+              {formatAddress(account)}
+            </div>
+          ) : (
+            <button
+              onClick={openWalletModal}
+              className="inline-flex items-center justify-center rounded-full border border-white/10 bg-white/8 px-5 py-3 text-sm font-medium text-white transition hover:border-accent/40 hover:bg-white/10"
+            >
+              Connect Wallet
+            </button>
+          )}
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
