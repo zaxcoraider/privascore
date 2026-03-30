@@ -1,0 +1,23 @@
+{
+  "name": "privascore",
+  "version": "1.0.0",
+  "description": "Private on-chain credit scoring for DeFi using Fhenix FHE",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "deploy:sepolia": "hardhat run scripts/deploy.ts --network arbitrum-sepolia"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "hardhat": "^2.22.0",
+    "typescript": "^5.4.0",
+    "ts-node": "^10.9.2",
+    "@types/node": "^20.0.0",
+    "dotenv": "^16.4.5",
+    "chai": "^4.4.1"
+  },
+  "dependencies": {
+    "@fhenixprotocol/cofhe-contracts": "^0.1.0",
+    "cofhejs": "^0.1.0"
+  }
+}
