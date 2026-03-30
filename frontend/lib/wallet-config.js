@@ -2,26 +2,24 @@
 
 import { createConfig, http } from "wagmi";
 import { arbitrumSepolia } from "wagmi/chains";
-// These direct file imports avoid pulling in optional connector exports such as
-// `porto`, which break the Next.js static build in this project setup.
-import { coinbaseWallet } from "../node_modules/@wagmi/connectors/dist/esm/coinbaseWallet.js";
-import { metaMask } from "../node_modules/@wagmi/connectors/dist/esm/metaMask.js";
-import { walletConnect } from "../node_modules/@wagmi/connectors/dist/esm/walletConnect.js";
+import { coinbaseWallet, metaMask, walletConnect } from "wagmi/connectors";
 
 const walletConnectProjectId =
   process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || "";
+const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://privascore.app";
+const appIconUrl = `${appUrl}/privascore-icon.svg`;
 
 const connectors = [
   metaMask({
     dappMetadata: {
       name: "PrivaScore",
-      url: "https://privascore.app",
-      iconUrl: "/privascore-icon.svg",
+      url: appUrl,
+      iconUrl: appIconUrl,
     },
   }),
   coinbaseWallet({
     appName: "PrivaScore",
-    appLogoUrl: "/privascore-icon.svg",
+    appLogoUrl: appIconUrl,
   }),
 ];
 
@@ -34,8 +32,8 @@ if (walletConnectProjectId) {
       metadata: {
         name: "PrivaScore",
         description: "Private on-chain credit scoring for DeFi lending.",
-        url: "https://privascore.app",
-        icons: ["/privascore-icon.svg"],
+        url: appUrl,
+        icons: [appIconUrl],
       },
       showQrModal: true,
     }),
@@ -65,7 +63,7 @@ export const walletOptions = [
 export const wagmiConfig = createConfig({
   chains: [arbitrumSepolia],
   connectors,
-  ssr: true,
+  ssr: false,
   transports: {
     [arbitrumSepolia.id]: http("https://sepolia-rollup.arbitrum.io/rpc"),
   },
