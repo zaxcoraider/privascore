@@ -15,6 +15,11 @@ const ibmPlexMono = IBM_Plex_Mono({
 export const metadata = {
   title: "PrivaScore",
   description: "Private on-chain credit scoring for DeFi lending.",
+  icons: {
+    icon: "/privascore-icon.svg",
+    shortcut: "/privascore-icon.svg",
+    apple: "/privascore-icon.svg",
+  },
 };
 
 export default function RootLayout({ children }) {
@@ -26,4 +31,3 @@ export default function RootLayout({ children }) {
     </html>
   );
 }
-
